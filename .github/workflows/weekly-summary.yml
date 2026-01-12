@@ -1,0 +1,85 @@
+name: Weekly Calendar Summary
+
+# Run every Sunday at 6 PM UTC (adjust timezone as needed)
+# Cron format: minute hour day-of-month month day-of-week
+# 0 18 * * 0 = At 18:00 (6 PM) on Sunday
+on:
+  schedule:
+    - cron: '0 18 * * 0'
+
+  # Allow manual triggering from GitHub Actions UI
+  workflow_dispatch:
+
+jobs:
+  send-summary:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Check out the repository code
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Step 2: Set up Python environment
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      # Step 3: Install dependencies
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # Step 4: Decode and save Google Calendar credentials
+      # The credentials.json file should be base64-encoded and stored as a GitHub secret
+      - name: Set up Google Calendar credentials
+        env:
+          GOOGLE_CREDENTIALS_BASE64: ${{ secrets.GOOGLE_CREDENTIALS_BASE64 }}
+        run: |
+          echo "$GOOGLE_CREDENTIALS_BASE64" | base64 -d > credentials.json
+
+      # Step 5: Decode and save Google Calendar token (if it exists)
+      # After first OAuth flow, save token.json as base64 in secrets for subsequent runs
+      - name: Set up Google Calendar token
+        if: ${{ secrets.GOOGLE_TOKEN_BASE64 != '' }}
+        env:
+          GOOGLE_TOKEN_BASE64: ${{ secrets.GOOGLE_TOKEN_BASE64 }}
+        run: |
+          echo "$GOOGLE_TOKEN_BASE64" | base64 -d > token.json
+
+      # Step 6: Run the calendar summary script
+      - name: Generate and send calendar summary
+        env:
+          # Google Calendar (paths are set above)
+          GOOGLE_CALENDAR_CREDENTIALS_PATH: ./credentials.json
+          GOOGLE_CALENDAR_TOKEN_PATH: ./token.json
+          CALENDAR_ID: ${{ secrets.CALENDAR_ID }}
+
+          # Claude API
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
+          # Twilio WhatsApp
+          TWILIO_ACCOUNT_SID: ${{ secrets.TWILIO_ACCOUNT_SID }}
+          TWILIO_AUTH_TOKEN: ${{ secrets.TWILIO_AUTH_TOKEN }}
+          TWILIO_WHATSAPP_FROM: ${{ secrets.TWILIO_WHATSAPP_FROM }}
+          TWILIO_WHATSAPP_TO: ${{ secrets.TWILIO_WHATSAPP_TO }}
+
+          # Optional settings
+          DRY_RUN: false
+          VERBOSE: true
+        run: |
+          cd src
+          python main.py --verbose
+
+      # Step 7: Save updated token (in case it was refreshed)
+      # This is optional but helps avoid re-authentication
+      - name: Update token secret (if changed)
+        if: always()
+        run: |
+          if [ -f token.json ]; then
+            echo "Token file exists, consider updating GOOGLE_TOKEN_BASE64 secret"
+            # Note: GitHub Actions cannot update secrets automatically
+            # You'll need to manually update the secret if token changes
+          fi
