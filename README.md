@@ -56,7 +56,8 @@ calendar-summary/
 │   └── summary_prompt.txt       # Editable Claude prompt
 └── .github/
     └── workflows/
-        └── weekly-summary.yml   # GitHub Actions schedule
+        ├── weekly-summary.yml   # Sunday: Main calendar summary
+        └── keep-alive.yml       # Wednesday: Twilio sandbox keep-alive
 ```
 
 ## 🚀 Quick Start
@@ -176,7 +177,13 @@ ANTHROPIC_API_KEY=sk-ant-api03-your-key-here
 2. Send the join code (e.g., "join abc-def") to the sandbox number
 3. You should receive a confirmation message
 
-**Important**: Sandbox sessions expire after 72 hours of inactivity. You'll need to rejoin by sending the code again.
+**⚠️ Important - 72-Hour Limitation**:
+- The sandbox expires after 72 hours of inactivity (no messages sent/received)
+- Since this bot runs **weekly** (168 hours apart), the session would normally expire
+- **Solution**: We've included a keep-alive workflow (`keep-alive.yml`) that sends pings on **Tuesday and Friday**
+- This keeps all gaps under 72 hours: Sunday→Tuesday (66h), Tuesday→Friday (72h), Friday→Sunday (54h)
+- Your session stays active automatically - no manual rejoining needed!
+- If you disable the keep-alive workflow, you'll need to manually rejoin before each Sunday run
 
 #### Step 4: Get Credentials
 
@@ -290,7 +297,9 @@ cat token.json | base64 > token.txt
 
 1. Go to **Actions** tab in your repository
 2. Enable workflows if prompted
-3. The workflow will run every Sunday at 6 PM UTC (adjust in `.github/workflows/weekly-summary.yml`)
+3. **Two workflows will be enabled**:
+   - `weekly-summary.yml`: Runs every Sunday at 6 PM UTC (main calendar summary)
+   - `keep-alive.yml`: Runs every Tuesday & Friday at 12 PM UTC (prevents Twilio sandbox expiry)
 
 #### Step 5: Manual Test
 
@@ -416,8 +425,9 @@ The codebase is designed for easy extension:
 ### Twilio WhatsApp Issues
 
 **"Not a valid WhatsApp recipient"**
-- Ensure you've joined the Twilio sandbox
-- Resend the join code if 72 hours have passed
+- Ensure you've joined the Twilio sandbox (send join code to sandbox number)
+- If using GitHub Actions, check that the `keep-alive.yml` workflow is enabled and running
+- If keep-alive is disabled, you'll need to rejoin weekly by sending the join code
 
 **"Authentication Error"**
 - Double-check `TWILIO_ACCOUNT_SID` and `TWILIO_AUTH_TOKEN`
@@ -426,6 +436,12 @@ The codebase is designed for easy extension:
 **"Message truncated"**
 - WhatsApp messages via Twilio are limited to 1600 characters
 - Consider shortening your Claude prompt or using `--weekly-only`
+
+**Sandbox keeps expiring despite keep-alive**
+- Check that `keep-alive.yml` workflow is running successfully in GitHub Actions
+- Verify the workflow has the correct Twilio credentials as secrets
+- The keep-alive runs Tuesdays & Fridays at 12 PM UTC - you should see both in Actions history
+- Make sure you haven't disabled the workflow
 
 ### GitHub Actions Issues
 
@@ -469,7 +485,7 @@ Contributions are welcome! Feel free to:
 2. **Schedule wisely**: Sunday evening is great, but adjust to your preference
 3. **Customize the prompt**: The default is a starting point - make it yours!
 4. **Monitor costs**: Check Claude API usage in console.anthropic.com
-5. **Sandbox expiry**: Remember to rejoin Twilio sandbox every 72 hours
+5. **Keep-alive active**: The Wednesday keep-alive workflow prevents Twilio sandbox expiry automatically
 
 ---
 

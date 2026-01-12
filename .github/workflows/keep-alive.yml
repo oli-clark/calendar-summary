@@ -1,0 +1,64 @@
+name: WhatsApp Keep-Alive
+
+# Run twice per week to keep Twilio sandbox session active
+# This prevents the 72-hour inactivity timeout between weekly Sunday runs
+# Schedule: Tuesday + Friday ensures max 72-hour gaps between messages
+on:
+  schedule:
+    - cron: '0 12 * * 2'  # Tuesday at noon UTC
+    - cron: '0 12 * * 5'  # Friday at noon UTC
+
+  # Allow manual triggering for testing
+  workflow_dispatch:
+
+jobs:
+  keep-alive-ping:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Check out the repository code
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Step 2: Set up Python environment
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      # Step 3: Install dependencies (only Twilio needed for keep-alive)
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install twilio python-dotenv
+
+      # Step 4: Send keep-alive message via Twilio WhatsApp
+      - name: Send keep-alive ping
+        env:
+          TWILIO_ACCOUNT_SID: ${{ secrets.TWILIO_ACCOUNT_SID }}
+          TWILIO_AUTH_TOKEN: ${{ secrets.TWILIO_AUTH_TOKEN }}
+          TWILIO_WHATSAPP_FROM: ${{ secrets.TWILIO_WHATSAPP_FROM }}
+          TWILIO_WHATSAPP_TO: ${{ secrets.TWILIO_WHATSAPP_TO }}
+        run: |
+          python3 << 'EOF'
+          import os
+          from twilio.rest import Client
+
+          # Initialize Twilio client
+          client = Client(
+              os.environ['TWILIO_ACCOUNT_SID'],
+              os.environ['TWILIO_AUTH_TOKEN']
+          )
+
+          # Send a simple keep-alive message
+          message = client.messages.create(
+              body="🔄 Keep-alive ping: Your calendar bot is still active!",
+              from_=os.environ['TWILIO_WHATSAPP_FROM'],
+              to=os.environ['TWILIO_WHATSAPP_TO']
+          )
+
+          print(f"✓ Keep-alive message sent successfully!")
+          print(f"  Message SID: {message.sid}")
+          print(f"  Status: {message.status}")
+          EOF
